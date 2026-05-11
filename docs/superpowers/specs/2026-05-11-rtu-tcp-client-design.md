@@ -1,4 +1,4 @@
-# RTU→TCP Client — Design Spec
+# RTU→TCP Client + Optional Timeouts — Design Spec
 
 **Date:** 2026-05-11  
 **Status:** Approved
@@ -7,52 +7,117 @@
 
 ## Summary
 
-Add a `Client<S, TX>` type that mirrors `Bridge<S, TX>` in the opposite
-direction. Where `Bridge` accepts Modbus TCP connections and proxies requests to
-a serial RTU device, `Client` listens on the serial bus for RTU requests from a
-Modbus master and proxies them to an upstream Modbus TCP server.
+Two additions:
+
+1. **`Client<S, TX, D>`** — mirrors `Bridge` in the opposite direction. Listens
+   on the serial bus for RTU requests from a Modbus master and proxies them to
+   an upstream Modbus TCP server.
+
+2. **Optional I/O timeouts** — both `Bridge` and `Client` gain optional
+   per-operation RTU and TCP timeouts. Timeouts bound individual I/O waits
+   inside `next()`; reconnection policy remains the caller's responsibility.
 
 ---
 
 ## Architecture
 
-The implementation is a strict structural mirror of the existing `Bridge` /
-`Connection` / `BridgeBuilder` trio.
+### Client (mirrors Bridge)
 
-| Bridge (TCP→RTU)         | Client (RTU→TCP)              |
-|--------------------------|-------------------------------|
-| `Bridge<S, TX>`          | `Client<S, TX>`               |
-| `BridgeBuilder<S, TX>`   | `ClientBuilder<S, TX>`        |
-| `Connection<'b,S,TX,TS>` | `ClientSession<'b,S,TX,TS>`   |
-| `bridge.accept(stream)`  | `client.connect(stream)`      |
-| `conn.next()`            | `session.next()`              |
-| `conn.into_stream()`     | `session.into_stream()`       |
+| Bridge (TCP→RTU)           | Client (RTU→TCP)                |
+|----------------------------|---------------------------------|
+| `Bridge<S, TX, D>`         | `Client<S, TX, D>`              |
+| `BridgeBuilder<S, TX, D>`  | `ClientBuilder<S, TX, D>`       |
+| `Connection<'b,S,TX,TS>`   | `ClientSession<'b,S,TX,TS>`     |
+| `bridge.accept(stream)`    | `client.connect(stream)`        |
+| `conn.next()`              | `session.next()`                |
+| `conn.into_stream()`       | `session.into_stream()`         |
 
-`Client<S, TX>` owns the RTU serial port and RS-485 TX-enable pin.  
-The TCP stream (connection to the upstream Modbus TCP server) is passed by the
-caller to `client.connect(stream)`, which returns a `ClientSession`. The caller
-owns the TCP lifecycle — when to connect, when to reconnect.
+### Timeout generic parameter `D`
 
-Only one `ClientSession` can be active at a time. The `ClientSession` mutably
-borrows `Client` for its lifetime, identical to how `Connection` borrows
-`Bridge`.
+Both `Bridge` and `Client` (and their builders) gain a third generic parameter
+`D` with a default of `NoDelay`:
+
+```rust
+pub struct Bridge<S, TX, D = NoDelay> { ... }
+pub struct Client<S, TX, D = NoDelay> { ... }
+```
+
+`D` must implement `embedded_hal_async::delay::DelayNs` (async feature) or be
+`NoDelay` (sync feature, no-op). Because `D = NoDelay` is the default, all
+existing code that writes `Bridge<Uart, Pin>` continues to compile unchanged —
+no breaking change.
+
+`NoDelay` is a new exported zero-sized type. Its `DelayNs` impl panics if a
+non-zero timeout is set (debug guard), and is a no-op if no timeout is
+configured. In practice, `NoDelay` users simply don't call `.rtu_timeout()` or
+`.tcp_timeout()`.
+
+---
+
+## Timeout Design
+
+### Builder configuration
+
+Both `BridgeBuilder` and `ClientBuilder` gain three new methods:
+
+```rust
+/// Sets the RTU I/O timeout (applied to reading each RTU frame).
+pub fn rtu_timeout(self, ms: u32) -> Self;
+
+/// Sets the TCP I/O timeout (applied to reading each TCP response).
+pub fn tcp_timeout(self, ms: u32) -> Self;
+
+/// Supplies the async delay provider and upgrades D from NoDelay.
+pub fn delay<D2: DelayNs>(self, delay: D2) -> Builder<S, TX, D2>;
+```
+
+Timeouts are stored as `Option<u32>` (milliseconds) in the builder and
+forwarded to the built `Bridge`/`Client`.
+
+### Application inside `next()`
+
+Timeouts are applied at two points in the cycle using
+`futures::future::select` to race the I/O future against a delay future:
+
+| Step | Timeout applied |
+|------|----------------|
+| RTU frame receive | `rtu_timeout_ms` |
+| TCP response receive | `tcp_timeout_ms` |
+
+If the delay fires before I/O completes, `next()` returns
+`Err(BridgeError::Timeout)`.
+
+### Sync feature
+
+The `delay()` builder method and the timeout fields are present in sync builds
+for API consistency, but timeout enforcement is a no-op: the delay type is
+unused and `BridgeError::Timeout` is never emitted. This is documented
+explicitly. A `debug_assert` fires if a timeout is configured with `NoDelay`.
+
+### New dependency
+
+```toml
+embedded-hal-async = { version = "1.0", optional = true }
+futures-util       = { version = "0.3", default-features = false,
+                       features = ["async-await"], optional = true }
+```
+
+Both are folded into the existing `async` feature so no new feature flag is
+needed.
 
 ---
 
 ## Per-cycle Flow (`ClientSession::next`)
 
-One call to `next()` drives one complete request/response cycle:
-
-1. Listen on the serial bus for a complete RTU request from a Modbus master
-   (CRC verified).
-2. Assign a wrapping transaction ID and encode as a Modbus TCP frame (MBAP +
-   PDU, no CRC).
-3. Send the TCP frame to the upstream server.
+1. Listen on the serial bus for a complete RTU request (CRC verified).
+   → Apply `rtu_timeout_ms` around this read.
+2. Assign a transaction ID; encode as Modbus TCP (MBAP + PDU, no CRC).
+3. Send TCP frame to the upstream server.
 4. Read the TCP response (MBAP length-prefixed).
-5. Verify the transaction ID matches; on mismatch emit
-   `BridgeEvent::Warning(Warning::TransactionIdMismatch)` and continue.
-6. Strip MBAP, re-add CRC-16, send the RTU response back to the serial master.
-7. Return `BridgeEvent::Transaction` describing the proxied request.
+   → Apply `tcp_timeout_ms` around this read.
+5. Verify transaction ID; on mismatch emit `BridgeEvent::Warning`.
+6. Strip MBAP, re-add CRC-16, send RTU response to the serial master.
+7. Return `BridgeEvent::Transaction`.
 
 ---
 
@@ -60,9 +125,21 @@ One call to `next()` drives one complete request/response cycle:
 
 | File | Contents |
 |------|----------|
-| `src/client.rs` | `Client<S, TX>` struct; `builder()`, `connect()`, `into_inner()` — async and sync cfg blocks |
-| `src/client_builder.rs` | `ClientBuilder<S, TX>` typestate builder — identical pattern to `builder.rs` |
+| `src/client.rs` | `Client<S, TX, D>` struct; `builder()`, `connect()`, `into_inner()` |
+| `src/client_builder.rs` | `ClientBuilder<S, TX, D>` typestate builder |
 | `src/client_session.rs` | `ClientSession<'b,S,TX,TS>`; `next()` (async+sync), `into_stream()` |
+
+### Modified files
+
+| File | Change |
+|------|--------|
+| `src/lib.rs` | Add new modules + re-exports; add `NoDelay` export |
+| `src/bridge.rs` | Add `D` type param; forward timeout/delay from builder |
+| `src/builder.rs` | Add `D` type param; add `delay()`, `rtu_timeout()`, `tcp_timeout()` |
+| `src/connection.rs` | Apply timeout in `next()` via `D` |
+| `src/event.rs` | Add `BridgeError::RtuClosed` and `BridgeError::Timeout` variants |
+| `src/flow.rs` | **Delete** (dead code, see below) |
+| `Cargo.toml` | Add `embedded-hal-async`, `futures-util` to `async` feature |
 
 ---
 
@@ -76,53 +153,106 @@ pub mod client_session;
 pub use client::Client;
 pub use client_builder::ClientBuilder;
 pub use client_session::ClientSession;
+pub use NoDelay;          // already exported; ensure visible
 ```
-
-All existing event/error types (`BridgeEvent`, `BridgeError`, `Transaction`,
-`Warning`, `FunctionCode`) are reused unchanged.
 
 ---
 
-## Cleanup: remove `flow.rs`
+## Cleanup: delete `flow.rs`
 
-The dead `bridge_flow` and `client_flow` functions in `src/flow.rs` are removed.
-`Connection::next()` already inlines the bridge logic; `ClientSession::next()`
-will do the same. Removing `flow.rs` eliminates the remaining dead-code warnings
-and the unused `mod flow` declaration.
+`src/flow.rs` contains dead `bridge_flow` and `client_flow` functions whose
+logic is inlined directly in `Connection::next()` and will be inlined in
+`ClientSession::next()`. Deleting it removes all remaining dead-code warnings
+from this module and removes the `mod flow` declaration from `lib.rs`.
+
+---
+
+## Error additions (`src/event.rs`)
+
+```rust
+pub enum BridgeError<SE, TE> {
+    TcpClosed,           // existing — TCP client/server EOF
+    RtuClosed,           // NEW — RTU master EOF (normal exit for Client)
+    TcpIo(TE),
+    RtuIo(SE),
+    RtuCrcMismatch,
+    BufferOverflow,
+    Timeout,             // NEW — rtu_timeout or tcp_timeout expired
+}
+```
+
+| Display string | Variant |
+|----------------|---------|
+| `"RTU connection closed"` | `RtuClosed` |
+| `"I/O timeout"` | `Timeout` |
+
+`RtuClosed` is the normal exit condition in client mode (equivalent to
+`TcpClosed` in bridge mode).
+
+---
+
+## Error Mapping
+
+| Condition | `BridgeError` variant |
+|-----------|----------------------|
+| RTU stream EOF | `RtuClosed` |
+| RTU serial I/O error | `RtuIo(SE)` |
+| RTU request CRC invalid | `RtuCrcMismatch` |
+| TCP server EOF | `TcpClosed` |
+| TCP server I/O error | `TcpIo(TE)` |
+| RTU or TCP timeout expired | `Timeout` |
+| Frame too large | `BufferOverflow` |
+| TID mismatch | `BridgeEvent::Warning` (non-fatal) |
 
 ---
 
 ## Tests
 
-New `client_tests` module in `tests/integration.rs`, async-gated with
-`#[cfg(feature = "async")]`, using the existing `MockStream` and `MockPin`
-infrastructure.
+### Client tests
 
-**Fixtures** (new, in `fixtures` module):
-- `rtu_read_request()` — valid RTU read-holding-registers request with CRC
-- `tcp_read_response()` — valid Modbus TCP response (MBAP + PDU)
-- `tcp_bad_crc_response()` — `tcp_read_response` with last CRC byte flipped
-- `tcp_tid_mismatch_response()` — `tcp_read_response` with transaction ID set to 0xFFFF
+New `client_tests` module in `tests/integration.rs` (`#[cfg(feature = "async")]`),
+using existing `MockStream` and `MockPin`.
+
+**New fixtures:**
+- `rtu_read_request()` — valid RTU FC03 request bytes with CRC
+- `tcp_read_response()` — valid Modbus TCP response (MBAP + PDU, tid=1)
+- `tcp_bad_crc_response()` — `tcp_read_response` with final byte flipped
+- `tcp_tid_mismatch_response()` — `tcp_read_response` with TID set to 0xFFFF
 
 **Test cases:**
-1. `next_returns_transaction_on_happy_path` — full RTU→TCP→RTU cycle succeeds
-2. `next_returns_rtu_closed_on_empty_rtu_stream` — empty RTU stream → `BridgeError::TcpClosed`
-3. `next_returns_rtu_crc_mismatch_on_bad_tcp_response` — bad CRC in TCP response → `BridgeError::RtuCrcMismatch`
-4. `next_returns_warning_on_tid_mismatch` — TID mismatch in TCP response → `BridgeEvent::Warning`
-5. `tcp_request_echoes_rtu_unit_id` — verifies unit ID is preserved through the TCP frame
-6. `into_stream_returns_tcp_stream_after_next` — TCP stream has bytes written; RTU rx consumed
-7. `client_serves_multiple_sequential_sessions` — client re-usable after session ends
+1. `next_returns_transaction_on_happy_path`
+2. `next_returns_rtu_closed_on_empty_rtu_stream`
+3. `next_returns_crc_mismatch_on_bad_tcp_response`
+4. `next_returns_warning_on_tid_mismatch`
+5. `tcp_request_sent_contains_rtu_unit_id`
+6. `into_stream_returns_tcp_stream_with_bytes_written`
+7. `client_serves_multiple_sequential_sessions`
+
+### Timeout tests
+
+New `timeout_tests` module in `tests/integration.rs` (`#[cfg(feature = "async")]`).
+Uses a `MockDelay` that fires immediately (zero-duration) to force timeout
+without real time passing.
+
+**Test cases:**
+1. `rtu_timeout_returns_timeout_error` — rtu_timeout set, RTU stream stalls → `Timeout`
+2. `tcp_timeout_returns_timeout_error` — tcp_timeout set, TCP stream stalls → `Timeout`
+3. `no_timeout_with_nodelay_succeeds` — no timeout configured, `NoDelay` used → no error
+4. `bridge_rtu_timeout_on_slow_device` — same as (1) but for `Bridge::accept`
+5. `bridge_tcp_timeout_on_slow_client` — same as (2) but for `Bridge::accept`
+
+`MockDelay` implements `DelayNs` and resolves after N polls (configurable), or
+immediately when set to 0.
 
 ---
 
 ## Fuzzing
 
 New fuzz target `fuzz/fuzz_targets/fuzz_client_session.rs` — feeds arbitrary
-bytes as the inbound **TCP response** (the untrusted input in client mode) and
-verifies no panics. Mirrors the existing `fuzz_frame` target.
+bytes as the inbound TCP response (untrusted input in client mode). Verifies no
+panics. Mirrors existing `fuzz_frame`.
 
 Add to `fuzz/Cargo.toml`:
-
 ```toml
 [[bin]]
 name = "fuzz_client_session"
@@ -133,32 +263,9 @@ doc = false
 
 ---
 
-## Error Mapping
-
-A new `BridgeError::RtuClosed` variant is added to distinguish an RTU master
-disconnect from a TCP server disconnect:
-
-| Condition | `BridgeError` variant |
-|-----------|----------------------|
-| RTU stream EOF (master disconnected) | `RtuClosed` *(new variant)* |
-| RTU serial I/O error | `RtuIo(SE)` |
-| RTU request CRC invalid | `RtuCrcMismatch` |
-| TCP server closed the connection | `TcpClosed` |
-| TCP server I/O error | `TcpIo(TE)` |
-| TCP response frame too large | `BufferOverflow` |
-| TID mismatch | `BridgeEvent::Warning` (not an error) |
-
-`RtuClosed` is the normal exit condition in client mode (equivalent to
-`TcpClosed` in bridge mode). The `Display` impl for `RtuClosed` reads
-`"RTU connection closed"`.
-
-`BridgeError::TcpClosed` in bridge mode continues to mean TCP client EOF,
-unchanged.
-
----
-
 ## Out of Scope
 
 - Automatic TCP reconnection (caller responsibility)
+- Sync-mode timeout enforcement (async only)
 - Multi-session / connection pooling
-- RTU broadcast (unit ID 0) handling beyond transparent passthrough
+- RTU broadcast (unit ID 0) passthrough is transparent, no special handling
