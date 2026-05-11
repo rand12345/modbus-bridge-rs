@@ -89,10 +89,33 @@ If the delay fires before I/O completes, `next()` returns
 
 ### Sync feature
 
-The `delay()` builder method and the timeout fields are present in sync builds
-for API consistency, but timeout enforcement is a no-op: the delay type is
-unused and `BridgeError::Timeout` is never emitted. This is documented
-explicitly. A `debug_assert` fires if a timeout is configured with `NoDelay`.
+Sync timeouts are fully supported using two traits already present in the
+existing dependencies — no new crates needed:
+
+| Trait | Crate | Purpose |
+|-------|-------|---------|
+| `embedded_io::ReadReady` | `embedded-io` 0.6 (existing) | Non-blocking readiness check |
+| `embedded_hal::delay::DelayNs` | `embedded-hal` 1.0 (existing) | Blocking inter-poll sleep |
+
+Implementation: poll `read_ready()` in a 1ms loop, decrement a countdown,
+return `BridgeError::Timeout` when the budget reaches zero.
+
+```
+loop {
+    if stream.read_ready()? { return read(); }
+    if elapsed_ms >= timeout_ms { return Err(Timeout); }
+    delay.delay_ms(1);
+    elapsed_ms += 1;
+}
+```
+
+Granularity is ~1ms — appropriate for Modbus (typical response timeouts
+200–2000ms).
+
+**Additional bound:** When timeouts are configured in sync mode, `S` must
+implement `ReadReady` in addition to `Read + Write`. This bound is only
+required on the `impl` block that uses a timeout (`D != NoDelay`), so users
+who do not configure timeouts see no API change.
 
 ### New dependency
 
@@ -266,6 +289,5 @@ doc = false
 ## Out of Scope
 
 - Automatic TCP reconnection (caller responsibility)
-- Sync-mode timeout enforcement (async only)
 - Multi-session / connection pooling
 - RTU broadcast (unit ID 0) passthrough is transparent, no special handling
