@@ -81,6 +81,35 @@ mod mock {
             Ok(())
         }
     }
+
+    /// A read-only stream whose reads never resolve — simulates a stalled device.
+    pub struct StallStream;
+
+    impl ErrorType for StallStream {
+        type Error = MockError;
+    }
+
+    impl Read for StallStream {
+        async fn read(&mut self, _buf: &mut [u8]) -> Result<usize, MockError> {
+            core::future::pending().await
+        }
+    }
+
+    impl Write for StallStream {
+        async fn write(&mut self, buf: &[u8]) -> Result<usize, MockError> {
+            Ok(buf.len())
+        }
+        async fn flush(&mut self) -> Result<(), MockError> {
+            Ok(())
+        }
+    }
+
+    /// A delay provider that resolves immediately — causes timeouts to fire on the very first poll.
+    pub struct InstantDelay;
+
+    impl embedded_hal_async::delay::DelayNs for InstantDelay {
+        async fn delay_ns(&mut self, _ns: u32) {}
+    }
 }
 
 // ── CRC helper (mirrors private frame::crc, used by fixtures) ────────────────
@@ -568,5 +597,107 @@ mod event_tests {
     fn bridge_error_timeout_display() {
         let e: BridgeError<MockError, MockError> = BridgeError::Timeout;
         assert_eq!(e.to_string(), "I/O timeout");
+    }
+}
+
+#[cfg(feature = "async")]
+mod timeout_tests {
+    use futures::executor::block_on;
+    use modbus_bridge::{BridgeBuilder, BridgeError, ClientBuilder};
+
+    use crate::{
+        client_fixtures,
+        fixtures,
+        mock::{InstantDelay, MockPin, MockStream, StallStream},
+    };
+
+    #[test]
+    fn rtu_timeout_returns_timeout_error_for_client() {
+        block_on(async {
+            // RTU serial port stalls — InstantDelay fires before any bytes arrive.
+            let mut client = ClientBuilder::new()
+                .rtu(StallStream, MockPin)
+                .rtu_timeout(500)
+                .delay(InstantDelay)
+                .build();
+
+            let mut session = client.connect(MockStream::with_rx(&client_fixtures::tcp_read_response()));
+
+            assert!(
+                matches!(session.next().await, Err(BridgeError::Timeout)),
+                "expected Timeout"
+            );
+        });
+    }
+
+    #[test]
+    fn tcp_timeout_returns_timeout_error_for_client() {
+        block_on(async {
+            // RTU request arrives fine; TCP server response stalls.
+            let mut client = ClientBuilder::new()
+                .rtu(MockStream::with_rx(&client_fixtures::rtu_read_request()), MockPin)
+                .tcp_timeout(500)
+                .delay(InstantDelay)
+                .build();
+
+            let mut session = client.connect(StallStream);
+
+            assert!(
+                matches!(session.next().await, Err(BridgeError::Timeout)),
+                "expected Timeout"
+            );
+        });
+    }
+
+    #[test]
+    fn no_timeout_with_nodelay_succeeds() {
+        block_on(async {
+            // No timeout configured, NoDelay used — happy path still works.
+            let mut client = ClientBuilder::new()
+                .rtu(MockStream::with_rx(&client_fixtures::rtu_read_request()), MockPin)
+                .build();
+
+            let mut session = client.connect(MockStream::with_rx(&client_fixtures::tcp_read_response()));
+
+            assert!(session.next().await.is_ok(), "expected Ok");
+        });
+    }
+
+    #[test]
+    fn bridge_rtu_timeout_on_slow_device() {
+        block_on(async {
+            // TCP request arrives fine; RTU device response stalls.
+            let mut bridge = BridgeBuilder::new()
+                .rtu(StallStream, MockPin)
+                .rtu_timeout(500)
+                .delay(InstantDelay)
+                .build();
+
+            let mut conn = bridge.accept(MockStream::with_rx(&fixtures::tcp_read_request()));
+
+            assert!(
+                matches!(conn.next().await, Err(BridgeError::Timeout)),
+                "expected Timeout"
+            );
+        });
+    }
+
+    #[test]
+    fn bridge_tcp_timeout_on_slow_client() {
+        block_on(async {
+            // TCP client stalls — no request arrives.
+            let mut bridge = BridgeBuilder::new()
+                .rtu(MockStream::with_rx(&[]), MockPin)
+                .tcp_timeout(500)
+                .delay(InstantDelay)
+                .build();
+
+            let mut conn = bridge.accept(StallStream);
+
+            assert!(
+                matches!(conn.next().await, Err(BridgeError::Timeout)),
+                "expected Timeout"
+            );
+        });
     }
 }
