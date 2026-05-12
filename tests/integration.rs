@@ -134,6 +134,51 @@ mod fixtures {
     }
 }
 
+#[cfg(feature = "async")]
+mod client_fixtures {
+    use crate::crc;
+
+    /// RTU request from serial master: unit=1, FC=0x03 ReadHoldingRegisters,
+    /// start_addr=0, count=1. Eight bytes including CRC.
+    pub fn rtu_read_request() -> Vec<u8> {
+        let pdu = [0x01u8, 0x03, 0x00, 0x00, 0x00, 0x01];
+        let [lo, hi] = crc(&pdu);
+        let mut v = pdu.to_vec();
+        v.push(lo);
+        v.push(hi);
+        v
+    }
+
+    /// TCP response from upstream server: TID=1, unit=1, FC=03, 1 register = 0x0005.
+    pub fn tcp_read_response() -> Vec<u8> {
+        vec![
+            0x00, 0x01, // TID = 1
+            0x00, 0x00, // Modbus protocol identifier
+            0x00, 0x05, // PDU length = 5
+            0x01, 0x03, 0x02, 0x00, 0x05, // unit=1, FC=3, byte_count=2, data=5
+        ]
+    }
+
+    /// TCP response with TID=0x0000 instead of 0x0001 — triggers Warning::TransactionIdMismatch.
+    /// The fallback in ClientSession::next() calls tcp_resp_to_rtu with expected_tid=0, so
+    /// the response TID must be 0x0000 for the fallback to succeed and return a Warning.
+    pub fn tcp_tid_mismatch_response() -> Vec<u8> {
+        let mut v = tcp_read_response();
+        v[0] = 0x00;
+        v[1] = 0x00;
+        v
+    }
+
+    /// TCP response where MBAP PDU-length says 10 bytes but stream ends after 3 PDU bytes.
+    /// Causes `TcpClosed` (EOF during read).
+    pub fn tcp_truncated_response() -> Vec<u8> {
+        vec![
+            0x00, 0x01, 0x00, 0x00, 0x00, 0x0A, // MBAP: pdu_len=10
+            0x01, 0x03, 0x02, // only 3 bytes of PDU — stream ends here
+        ]
+    }
+}
+
 // ── Bridge tests (async only) ─────────────────────────────────────────────────
 
 #[cfg(feature = "async")]
@@ -255,6 +300,132 @@ mod bridge_tests {
 
             let mut conn = bridge.accept(MockStream::with_rx(&fixtures::tcp_read_request()));
             assert!(conn.next().await.is_ok());
+        });
+    }
+}
+
+#[cfg(feature = "async")]
+mod client_tests {
+    use futures::executor::block_on;
+    use modbus_bridge::{Client, ClientBuilder, BridgeError, BridgeEvent, FunctionCode, Transaction};
+
+    use crate::{
+        client_fixtures,
+        mock::{MockPin, MockStream},
+    };
+
+    fn make_client(serial_rx: &[u8]) -> Client<MockStream, MockPin> {
+        ClientBuilder::new()
+            .rtu(MockStream::with_rx(serial_rx), MockPin)
+            .build()
+    }
+
+    #[test]
+    fn next_returns_transaction_on_happy_path() {
+        block_on(async {
+            let mut client = make_client(&client_fixtures::rtu_read_request());
+            let mut session = client.connect(MockStream::with_rx(&client_fixtures::tcp_read_response()));
+
+            let event = session.next().await.expect("next() should succeed");
+
+            assert!(
+                matches!(
+                    event,
+                    BridgeEvent::Transaction(Transaction {
+                        unit_id: 1,
+                        function_code: FunctionCode::ReadHoldingRegisters,
+                        start_address: 0,
+                        register_count: 1,
+                    })
+                ),
+                "unexpected event: {:?}",
+                event
+            );
+        });
+    }
+
+    #[test]
+    fn next_returns_rtu_closed_on_empty_rtu_stream() {
+        block_on(async {
+            let mut client = make_client(&[]);
+            let mut session = client.connect(MockStream::with_rx(&client_fixtures::tcp_read_response()));
+
+            assert!(matches!(session.next().await, Err(BridgeError::RtuClosed)));
+        });
+    }
+
+    #[test]
+    fn next_returns_tcp_closed_on_truncated_tcp_response() {
+        block_on(async {
+            let mut client = make_client(&client_fixtures::rtu_read_request());
+            let mut session = client.connect(MockStream::with_rx(&client_fixtures::tcp_truncated_response()));
+
+            assert!(matches!(session.next().await, Err(BridgeError::TcpClosed)));
+        });
+    }
+
+    #[test]
+    fn next_returns_warning_on_tid_mismatch() {
+        block_on(async {
+            let mut client = make_client(&client_fixtures::rtu_read_request());
+            let mut session = client.connect(MockStream::with_rx(&client_fixtures::tcp_tid_mismatch_response()));
+
+            let event = session.next().await.expect("should succeed with warning");
+            assert!(
+                matches!(event, BridgeEvent::Warning(_)),
+                "expected Warning, got {:?}",
+                event
+            );
+        });
+    }
+
+    #[test]
+    fn tcp_request_sent_contains_rtu_unit_id() {
+        block_on(async {
+            let mut client = make_client(&client_fixtures::rtu_read_request());
+            let tcp_stream = MockStream::with_rx(&client_fixtures::tcp_read_response());
+            let mut session = client.connect(tcp_stream);
+
+            session.next().await.expect("ok");
+
+            let stream = session.into_stream();
+            // TCP MBAP layout: [tid_hi, tid_lo, proto_hi, proto_lo, len_hi, len_lo, UNIT_ID, FC, ...]
+            assert!(stream.tx.len() >= 7, "no TCP request written");
+            assert_eq!(stream.tx[6], 1, "unit_id not propagated to TCP frame");
+        });
+    }
+
+    #[test]
+    fn into_stream_returns_tcp_stream_with_bytes_written() {
+        block_on(async {
+            let mut client = make_client(&client_fixtures::rtu_read_request());
+            let mut session = client.connect(MockStream::with_rx(&client_fixtures::tcp_read_response()));
+
+            session.next().await.expect("ok");
+            let stream = session.into_stream();
+
+            assert!(stream.rx.is_empty(), "TCP stream not fully consumed");
+            assert!(!stream.tx.is_empty(), "no bytes written to TCP stream");
+        });
+    }
+
+    #[test]
+    fn client_serves_multiple_sequential_sessions() {
+        block_on(async {
+            let rtu_req = client_fixtures::rtu_read_request();
+            let tcp_resp = client_fixtures::tcp_read_response();
+
+            // Pre-load two consecutive RTU requests on the serial port
+            let mut serial_data = rtu_req.clone();
+            serial_data.extend_from_slice(&rtu_req);
+
+            let mut client = make_client(&serial_data);
+
+            for i in 0..2 {
+                let mut session = client.connect(MockStream::with_rx(&tcp_resp));
+                let result = session.next().await;
+                assert!(result.is_ok(), "iteration {i} failed: {:?}", result);
+            }
         });
     }
 }
