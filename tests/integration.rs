@@ -160,12 +160,11 @@ mod client_fixtures {
     }
 
     /// TCP response with TID=0x0000 instead of 0x0001 — triggers Warning::TransactionIdMismatch.
-    /// The fallback in ClientSession::next() calls tcp_resp_to_rtu with expected_tid=0, so
-    /// the response TID must be 0x0000 for the fallback to succeed and return a Warning.
+    /// TCP response with TID=0xFFFF instead of 0x0001 — triggers Warning::TransactionIdMismatch.
     pub fn tcp_tid_mismatch_response() -> Vec<u8> {
         let mut v = tcp_read_response();
-        v[0] = 0x00;
-        v[1] = 0x00;
+        v[0] = 0xFF;
+        v[1] = 0xFF;
         v
     }
 

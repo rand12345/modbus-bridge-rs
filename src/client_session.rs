@@ -78,11 +78,11 @@ where
         let (rtu_resp, tid_warning) = match frame::tcp_resp_to_rtu(&tcp_resp, tid) {
             Ok(r) => (r, None),
             Err(ModbusError::InvalidTransactionId) => {
-                let fallback = frame::tcp_resp_to_rtu(&tcp_resp, 0)
-                    .map_err(|_| BridgeError::BufferOverflow)?;
                 let rx_tid = tcp_resp.get(..2)
                     .map(|b| u16::from_be_bytes([b[0], b[1]]))
                     .unwrap_or(0);
+                let fallback = frame::tcp_resp_to_rtu(&tcp_resp, rx_tid)
+                    .map_err(|_| BridgeError::BufferOverflow)?;
                 (fallback, Some(Warning::TransactionIdMismatch { expected: tid, got: rx_tid }))
             }
             Err(_) => return Err(BridgeError::BufferOverflow),
@@ -170,11 +170,11 @@ where
         let (rtu_resp, tid_warning) = match frame::tcp_resp_to_rtu(&tcp_resp, tid) {
             Ok(r) => (r, None),
             Err(ModbusError::InvalidTransactionId) => {
-                let fallback = frame::tcp_resp_to_rtu(&tcp_resp, 0)
-                    .map_err(|_| BridgeError::BufferOverflow)?;
                 let rx_tid = tcp_resp.get(..2)
                     .map(|b| u16::from_be_bytes([b[0], b[1]]))
                     .unwrap_or(0);
+                let fallback = frame::tcp_resp_to_rtu(&tcp_resp, rx_tid)
+                    .map_err(|_| BridgeError::BufferOverflow)?;
                 (fallback, Some(Warning::TransactionIdMismatch { expected: tid, got: rx_tid }))
             }
             Err(_) => return Err(BridgeError::BufferOverflow),
@@ -232,11 +232,11 @@ where
         let (rtu_resp, tid_warning) = match frame::tcp_resp_to_rtu(&tcp_resp, tid) {
             Ok(r) => (r, None),
             Err(ModbusError::InvalidTransactionId) => {
-                let fallback = frame::tcp_resp_to_rtu(&tcp_resp, 0)
-                    .map_err(|_| BridgeError::BufferOverflow)?;
                 let rx_tid = if tcp_resp.len() >= 2 {
                     u16::from_be_bytes([tcp_resp[0], tcp_resp[1]])
                 } else { 0 };
+                let fallback = frame::tcp_resp_to_rtu(&tcp_resp, rx_tid)
+                    .map_err(|_| BridgeError::BufferOverflow)?;
                 (fallback, Some(Warning::TransactionIdMismatch { expected: tid, got: rx_tid }))
             }
             Err(_) => return Err(BridgeError::BufferOverflow),
@@ -329,11 +329,11 @@ where
         let (rtu_resp, tid_warning) = match frame::tcp_resp_to_rtu(&tcp_resp, tid) {
             Ok(r) => (r, None),
             Err(ModbusError::InvalidTransactionId) => {
-                let fallback = frame::tcp_resp_to_rtu(&tcp_resp, 0)
-                    .map_err(|_| BridgeError::BufferOverflow)?;
                 let rx_tid = if tcp_resp.len() >= 2 {
                     u16::from_be_bytes([tcp_resp[0], tcp_resp[1]])
                 } else { 0 };
+                let fallback = frame::tcp_resp_to_rtu(&tcp_resp, rx_tid)
+                    .map_err(|_| BridgeError::BufferOverflow)?;
                 (fallback, Some(Warning::TransactionIdMismatch { expected: tid, got: rx_tid }))
             }
             Err(_) => return Err(BridgeError::BufferOverflow),
