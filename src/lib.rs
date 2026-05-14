@@ -170,7 +170,6 @@ compile_error!("Exactly one of `sync` or `async` must be enabled.");
 // ── Private modules ───────────────────────────────────────────────────────────
 
 mod error;
-mod flow;
 mod frame;
 mod rtu;
 mod tcp;
