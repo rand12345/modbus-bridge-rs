@@ -294,3 +294,16 @@ macro_rules! mb_error {
 pub(crate) use mb_error;
 #[cfg(any(feature = "defmt", feature = "log"))]
 pub(crate) use mb_info;
+
+// ── Fuzzing surface (hidden from public docs) ─────────────────────────────────
+
+/// Internal module exposing frame primitives for fuzz targets.
+///
+/// Not part of the public API — stability not guaranteed.
+#[doc(hidden)]
+pub mod __fuzzing {
+    pub use crate::frame::{
+        check_crc, crc, rtu_resp_to_tcp, rtu_response_remaining, rtu_to_tcp,
+        tcp_resp_to_rtu, tcp_to_rtu,
+    };
+}

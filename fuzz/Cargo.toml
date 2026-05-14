@@ -1,0 +1,27 @@
+[package]
+name = "modbus-bridge-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+modbus-bridge  = { path = "..", features = ["async"] }
+
+[[bin]]
+name = "fuzz_frame"
+path = "fuzz_targets/fuzz_frame.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_client_session"
+path = "fuzz_targets/fuzz_client_session.rs"
+test = false
+doc = false
+
+# Own workspace so cargo-fuzz doesn't try to join the parent workspace.
+[workspace]

@@ -14,7 +14,7 @@ const MODBUS_PROTO: [u8; 2] = [0, 0];
 // ── CRC ──────────────────────────────────────────────────────────────────────
 
 /// Compute Modbus CRC-16 and return it as a little-endian `[lo, hi]` pair.
-pub(crate) fn crc(data: &[u8]) -> [u8; 2] {
+pub fn crc(data: &[u8]) -> [u8; 2] {
     let mut crc: u16 = 0xFFFF;
     for &byte in data {
         crc ^= byte as u16;
@@ -30,7 +30,7 @@ pub(crate) fn crc(data: &[u8]) -> [u8; 2] {
 }
 
 /// Verify the trailing 2-byte CRC on an RTU frame.
-pub(crate) fn check_crc(frame: &[u8]) -> Result<(), ModbusError<Infallible, Infallible>> {
+pub fn check_crc(frame: &[u8]) -> Result<(), ModbusError<Infallible, Infallible>> {
     if frame.len() < 4 {
         return Err(ModbusError::PayloadTooShort);
     }
@@ -45,7 +45,7 @@ pub(crate) fn check_crc(frame: &[u8]) -> Result<(), ModbusError<Infallible, Infa
 // ── RTU → TCP ────────────────────────────────────────────────────────────────
 
 /// Wrap an RTU request frame (PDU + CRC) into a Modbus TCP frame (MBAP + PDU, no CRC).
-pub(crate) fn rtu_to_tcp(
+pub fn rtu_to_tcp(
     rtu: &[u8],
     transaction_id: u16,
 ) -> Result<TcpResponse, ModbusError<Infallible, Infallible>> {
@@ -67,7 +67,7 @@ pub(crate) fn rtu_to_tcp(
 
 /// Unwrap a Modbus TCP request into an RTU frame (PDU + CRC).
 /// Returns `(rtu_frame, transaction_id)`.
-pub(crate) fn tcp_to_rtu(
+pub fn tcp_to_rtu(
     tcp: &[u8],
 ) -> Result<(RtuResponse, u16), ModbusError<Infallible, Infallible>> {
     if tcp.len() < 7 {
@@ -86,7 +86,7 @@ pub(crate) fn tcp_to_rtu(
 
 /// Convert a TCP response into an RTU response (strip MBAP, add CRC).
 /// Validates that the response transaction ID matches `expected_tid`.
-pub(crate) fn tcp_resp_to_rtu(
+pub fn tcp_resp_to_rtu(
     tcp: &[u8],
     expected_tid: u16,
 ) -> Result<RtuResponse, ModbusError<Infallible, Infallible>> {
@@ -112,7 +112,7 @@ pub(crate) fn tcp_resp_to_rtu(
 // ── RTU response → TCP response ───────────────────────────────────────────────
 
 /// Convert an RTU response into a TCP response (strip CRC, add MBAP).
-pub(crate) fn rtu_resp_to_tcp(
+pub fn rtu_resp_to_tcp(
     rtu: &[u8],
     transaction_id: u16,
 ) -> Result<TcpResponse, ModbusError<Infallible, Infallible>> {
@@ -135,7 +135,7 @@ pub(crate) fn rtu_resp_to_tcp(
 /// Given the first 3 bytes of an RTU response `[addr, fn_code, byte_count]`,
 /// return the number of additional bytes to read to complete the frame
 /// (payload bytes + 2 CRC bytes).
-pub(crate) fn rtu_response_remaining(header: &[u8; 3]) -> usize {
+pub fn rtu_response_remaining(header: &[u8; 3]) -> usize {
     header[2] as usize + 2
 }
 
