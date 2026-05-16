@@ -2,7 +2,7 @@
 
 #[cfg(any(feature = "defmt", feature = "log"))]
 use crate::mb_info;
-use crate::{error::ModbusError, frame::TcpResponse, mb_error};
+use crate::{error::ModbusError, mb_error};
 use core::convert::Infallible;
 
 /// Modbus TCP framing driver.
