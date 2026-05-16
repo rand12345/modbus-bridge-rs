@@ -31,9 +31,6 @@ impl<S> ModbusTcp<S> {
         self.transaction_id
     }
 
-    pub(crate) fn transaction_id(&self) -> u16 {
-        self.transaction_id
-    }
 }
 
 // ── Async impl ────────────────────────────────────────────────────────────────
@@ -79,32 +76,6 @@ where
         #[cfg(all(not(feature = "defmt"), feature = "log"))]
         mb_info!("TCP TX: {} bytes", data.len());
         Ok(())
-    }
-
-    /// Read a variable-length Modbus TCP response (MBAP header + PDU).
-    pub(crate) async fn receive(
-        &mut self,
-    ) -> Result<TcpResponse, ModbusError<Infallible, S::Error>> {
-        let mut header = [0u8; 6];
-        self.read_exact(&mut header).await?;
-
-        let pdu_len = u16::from_be_bytes([header[4], header[5]]) as usize;
-        let mut resp = TcpResponse::new();
-        resp.extend_from_slice(&header)
-            .map_err(|_| ModbusError::Push)?;
-
-        let mut byte = [0u8; 1];
-        for _ in 0..pdu_len {
-            self.read_exact(&mut byte).await?;
-            resp.push(byte[0]).map_err(|_| ModbusError::Push)?;
-        }
-
-        #[cfg(feature = "defmt")]
-        mb_info!("TCP RX resp: {=[u8]:x}", resp.as_slice());
-        #[cfg(all(not(feature = "defmt"), feature = "log"))]
-        mb_info!("TCP RX resp: {} bytes", resp.len());
-
-        Ok(resp)
     }
 
     async fn write_all(&mut self, data: &[u8]) -> Result<(), S::Error> {
@@ -173,31 +144,6 @@ where
         #[cfg(all(not(feature = "defmt"), feature = "log"))]
         mb_info!("TCP TX: {} bytes", data.len());
         Ok(())
-    }
-
-    pub(crate) fn receive(
-        &mut self,
-    ) -> Result<TcpResponse, ModbusError<Infallible, S::Error>> {
-        let mut header = [0u8; 6];
-        self.read_exact(&mut header)?;
-
-        let pdu_len = u16::from_be_bytes([header[4], header[5]]) as usize;
-        let mut resp = TcpResponse::new();
-        resp.extend_from_slice(&header)
-            .map_err(|_| ModbusError::Push)?;
-
-        let mut byte = [0u8; 1];
-        for _ in 0..pdu_len {
-            self.read_exact(&mut byte)?;
-            resp.push(byte[0]).map_err(|_| ModbusError::Push)?;
-        }
-
-        #[cfg(feature = "defmt")]
-        mb_info!("TCP RX resp: {=[u8]:x}", resp.as_slice());
-        #[cfg(all(not(feature = "defmt"), feature = "log"))]
-        mb_info!("TCP RX resp: {} bytes", resp.len());
-
-        Ok(resp)
     }
 
     fn write_all(&mut self, data: &[u8]) -> Result<(), S::Error> {
