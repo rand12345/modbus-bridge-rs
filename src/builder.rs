@@ -38,6 +38,14 @@ impl Default for BridgeBuilder<(), (), NoDelay> {
 
 impl<D> BridgeBuilder<(), (), D> {
     /// Supplies the serial port and RS-485 TX-enable pin.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// let bridge = Bridge::builder()
+    ///     .rtu(uart, tx_en_pin)
+    ///     .build();
+    /// ```
     pub fn rtu<S, TX>(self, serial: S, tx_en: TX) -> BridgeBuilder<S, TX, D> {
         BridgeBuilder {
             serial,
@@ -49,6 +57,16 @@ impl<D> BridgeBuilder<(), (), D> {
     }
 
     /// Supplies the serial port without a TX-enable pin.
+    ///
+    /// Use this when the RS-485 transceiver handles direction control automatically.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// let bridge = Bridge::builder()
+    ///     .rtu_no_pin(uart)
+    ///     .build();
+    /// ```
     pub fn rtu_no_pin<S>(self, serial: S) -> BridgeBuilder<S, NoPin, D> {
         BridgeBuilder {
             serial,

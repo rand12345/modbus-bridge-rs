@@ -38,6 +38,14 @@ impl Default for ClientBuilder<(), (), NoDelay> {
 
 impl<D> ClientBuilder<(), (), D> {
     /// Supplies the serial port and RS-485 TX-enable pin.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// let client = Client::builder()
+    ///     .rtu(uart, tx_en_pin)
+    ///     .build();
+    /// ```
     pub fn rtu<S, TX>(self, serial: S, tx_en: TX) -> ClientBuilder<S, TX, D> {
         ClientBuilder {
             serial,
@@ -49,6 +57,16 @@ impl<D> ClientBuilder<(), (), D> {
     }
 
     /// Supplies the serial port without a TX-enable pin.
+    ///
+    /// Use this when the RS-485 transceiver handles direction control automatically.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// let client = Client::builder()
+    ///     .rtu_no_pin(uart)
+    ///     .build();
+    /// ```
     pub fn rtu_no_pin<S>(self, serial: S) -> ClientBuilder<S, NoPin, D> {
         ClientBuilder {
             serial,
@@ -80,6 +98,14 @@ impl<S, TX, D> ClientBuilder<S, TX, D> {
     }
 
     /// Builds and returns the configured [`Client`](crate::Client).
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// let mut client = Client::builder()
+    ///     .rtu(uart, tx_en)
+    ///     .build();
+    /// ```
     pub fn build(self) -> Client<S, TX, D> {
         Client::from_parts(
             self.serial,
