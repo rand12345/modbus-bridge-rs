@@ -128,11 +128,12 @@ impl fmt::Display for Transaction {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Warning {
-    /// The transaction ID in the RTU response did not match the one sent in the
-    /// request. The response was forwarded using transaction ID 0 as a fallback.
+    /// The transaction ID in the TCP response did not match the one sent in the
+    /// request. The response was forwarded using the server's actual transaction
+    /// ID as a fallback.
     ///
-    /// This can occur with RTU devices that echo back stale or incorrect
-    /// transaction IDs. It is safe to continue after this warning.
+    /// This can occur with upstream servers or RTU devices that echo back stale
+    /// or incorrect transaction IDs. It is safe to continue after this warning.
     TransactionIdMismatch { expected: u16, got: u16 },
 }
 
