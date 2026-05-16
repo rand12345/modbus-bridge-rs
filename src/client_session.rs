@@ -28,6 +28,12 @@ impl<'b, S, TX, TS, D> ClientSession<'b, S, TX, TS, D> {
     }
 
     /// Consumes the session and returns the underlying TCP stream.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// let tcp_stream = session.into_stream();
+    /// ```
     pub fn into_stream(self) -> TS {
         self.tcp.into_inner()
     }
@@ -113,6 +119,21 @@ where
     D: embedded_hal_async::delay::DelayNs,
 {
     /// Drives one complete Modbus request/response cycle asynchronously, with timeouts.
+    ///
+    /// Reads an RTU request from the serial port, forwards it to the upstream
+    /// Modbus TCP server, and returns the response to the RTU master.
+    /// Applies `rtu_timeout_ms` around the RTU listen and `tcp_timeout_ms`
+    /// around the TCP response.
+    ///
+    /// # Errors
+    ///
+    /// - [`BridgeError::RtuClosed`](crate::BridgeError::RtuClosed) — RTU master sent EOF (normal disconnect).
+    /// - [`BridgeError::RtuIo`](crate::BridgeError::RtuIo) — Serial port I/O error.
+    /// - [`BridgeError::RtuCrcMismatch`](crate::BridgeError::RtuCrcMismatch) — RTU request failed CRC-16 check.
+    /// - [`BridgeError::TcpClosed`](crate::BridgeError::TcpClosed) — Upstream TCP server closed the connection.
+    /// - [`BridgeError::TcpIo`](crate::BridgeError::TcpIo) — TCP stream I/O error.
+    /// - [`BridgeError::BufferOverflow`](crate::BridgeError::BufferOverflow) — Frame exceeded internal buffer capacity.
+    /// - [`BridgeError::Timeout`](crate::BridgeError::Timeout) — An I/O operation did not complete within the configured deadline.
     pub async fn next(&mut self) -> Result<BridgeEvent, BridgeError<S::Error, TS::Error>> {
         use core::pin::pin;
         use futures_util::future::{select, Either};
@@ -204,6 +225,18 @@ where
     TS: embedded_io::Read + embedded_io::Write,
 {
     /// Drives one complete Modbus request/response cycle (blocking).
+    ///
+    /// Reads an RTU request from the serial port, forwards it to the upstream
+    /// Modbus TCP server, and returns the response to the RTU master.
+    ///
+    /// # Errors
+    ///
+    /// - [`BridgeError::RtuClosed`](crate::BridgeError::RtuClosed) — RTU master sent EOF (normal disconnect).
+    /// - [`BridgeError::RtuIo`](crate::BridgeError::RtuIo) — Serial port I/O error.
+    /// - [`BridgeError::RtuCrcMismatch`](crate::BridgeError::RtuCrcMismatch) — RTU request failed CRC-16 check.
+    /// - [`BridgeError::TcpClosed`](crate::BridgeError::TcpClosed) — Upstream TCP server closed the connection.
+    /// - [`BridgeError::TcpIo`](crate::BridgeError::TcpIo) — TCP stream I/O error.
+    /// - [`BridgeError::BufferOverflow`](crate::BridgeError::BufferOverflow) — Frame exceeded internal buffer capacity.
     pub fn next(&mut self) -> Result<BridgeEvent, BridgeError<S::Error, TS::Error>> {
         let rtu_req = self.client.rtu.listen().map_err(|e| match e {
             ModbusError::Serial(se) => BridgeError::RtuIo(se),
@@ -267,6 +300,20 @@ where
     D: embedded_hal::delay::DelayNs,
 {
     /// Drives one complete Modbus request/response cycle (blocking) with timeout support.
+    ///
+    /// Reads an RTU request from the serial port, forwards it to the upstream
+    /// Modbus TCP server, and returns the response to the RTU master.
+    /// Polls `ReadReady` before each I/O operation to enforce the timeout budget.
+    ///
+    /// # Errors
+    ///
+    /// - [`BridgeError::RtuClosed`](crate::BridgeError::RtuClosed) — RTU master sent EOF (normal disconnect).
+    /// - [`BridgeError::RtuIo`](crate::BridgeError::RtuIo) — Serial port I/O error.
+    /// - [`BridgeError::RtuCrcMismatch`](crate::BridgeError::RtuCrcMismatch) — RTU request failed CRC-16 check.
+    /// - [`BridgeError::TcpClosed`](crate::BridgeError::TcpClosed) — Upstream TCP server closed the connection.
+    /// - [`BridgeError::TcpIo`](crate::BridgeError::TcpIo) — TCP stream I/O error.
+    /// - [`BridgeError::BufferOverflow`](crate::BridgeError::BufferOverflow) — Frame exceeded internal buffer capacity.
+    /// - [`BridgeError::Timeout`](crate::BridgeError::Timeout) — An I/O operation did not complete within the configured deadline.
     pub fn next(&mut self) -> Result<BridgeEvent, BridgeError<S::Error, TS::Error>> {
         if let Some(timeout_ms) = self.client.rtu_timeout_ms {
             let mut elapsed = 0u32;
