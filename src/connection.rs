@@ -212,6 +212,17 @@ where
     TS: embedded_io::Read + embedded_io::Write,
 {
     /// Drives one complete Modbus request/response cycle (blocking).
+    ///
+    /// Reads one TCP frame, converts it to RTU, sends it to the RTU device,
+    /// reads the response, and writes the TCP reply.
+    ///
+    /// # Errors
+    ///
+    /// - [`BridgeError::TcpClosed`](crate::BridgeError::TcpClosed) — TCP client sent EOF (normal disconnect).
+    /// - [`BridgeError::TcpIo`](crate::BridgeError::TcpIo) — TCP stream I/O error.
+    /// - [`BridgeError::RtuIo`](crate::BridgeError::RtuIo) — Serial port I/O error.
+    /// - [`BridgeError::RtuCrcMismatch`](crate::BridgeError::RtuCrcMismatch) — RTU device response failed CRC-16 check.
+    /// - [`BridgeError::BufferOverflow`](crate::BridgeError::BufferOverflow) — Frame exceeded internal buffer capacity.
     pub fn next(&mut self) -> Result<BridgeEvent, BridgeError<S::Error, TS::Error>> {
         let tcp_req = self.tcp.listen().map_err(|e| match e {
             ModbusError::PayloadTooShort => BridgeError::TcpClosed,
@@ -273,7 +284,18 @@ where
 {
     /// Drives one complete Modbus request/response cycle (blocking) with timeout support.
     ///
-    /// Polls `ReadReady` before each I/O operation to enforce the timeout budget.
+    /// Reads one TCP frame, converts it to RTU, sends it to the RTU device,
+    /// reads the response, and writes the TCP reply. Polls `ReadReady` before
+    /// each I/O operation to enforce the timeout budget.
+    ///
+    /// # Errors
+    ///
+    /// - [`BridgeError::TcpClosed`](crate::BridgeError::TcpClosed) — TCP client sent EOF (normal disconnect).
+    /// - [`BridgeError::TcpIo`](crate::BridgeError::TcpIo) — TCP stream I/O error.
+    /// - [`BridgeError::RtuIo`](crate::BridgeError::RtuIo) — Serial port I/O error.
+    /// - [`BridgeError::RtuCrcMismatch`](crate::BridgeError::RtuCrcMismatch) — RTU device response failed CRC-16 check.
+    /// - [`BridgeError::BufferOverflow`](crate::BridgeError::BufferOverflow) — Frame exceeded internal buffer capacity.
+    /// - [`BridgeError::Timeout`](crate::BridgeError::Timeout) — An I/O operation did not complete within the configured deadline.
     pub fn next(&mut self) -> Result<BridgeEvent, BridgeError<S::Error, TS::Error>> {
         if let Some(timeout_ms) = self.bridge.tcp_timeout_ms {
             let mut elapsed = 0u32;
