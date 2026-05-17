@@ -77,7 +77,8 @@ where
                 // [start_hi, start_lo, qty_hi, qty_lo, byte_count]
                 let mut fixed = [0u8; 5];
                 self.read_exact(&mut fixed).await?;
-                req.extend_from_slice(&fixed).map_err(|_| ModbusError::Push)?;
+                req.extend_from_slice(&fixed)
+                    .map_err(|_| ModbusError::Push)?;
                 let byte_count = fixed[4] as usize;
                 // data bytes + 2 CRC bytes
                 let mut byte = [0u8; 1];
@@ -90,7 +91,8 @@ where
             _ => {
                 let mut rest = [0u8; 6];
                 self.read_exact(&mut rest).await?;
-                req.extend_from_slice(&rest).map_err(|_| ModbusError::Push)?;
+                req.extend_from_slice(&rest)
+                    .map_err(|_| ModbusError::Push)?;
             }
         }
 
@@ -203,7 +205,8 @@ where
             0x0F | 0x10 => {
                 let mut fixed = [0u8; 5];
                 self.read_exact(&mut fixed)?;
-                req.extend_from_slice(&fixed).map_err(|_| ModbusError::Push)?;
+                req.extend_from_slice(&fixed)
+                    .map_err(|_| ModbusError::Push)?;
                 let byte_count = fixed[4] as usize;
                 let mut byte = [0u8; 1];
                 for _ in 0..(byte_count + 2) {
@@ -214,7 +217,8 @@ where
             _ => {
                 let mut rest = [0u8; 6];
                 self.read_exact(&mut rest)?;
-                req.extend_from_slice(&rest).map_err(|_| ModbusError::Push)?;
+                req.extend_from_slice(&rest)
+                    .map_err(|_| ModbusError::Push)?;
             }
         }
 
@@ -273,10 +277,7 @@ where
         self.serial.flush()
     }
 
-    fn read_exact(
-        &mut self,
-        buf: &mut [u8],
-    ) -> Result<(), ModbusError<S::Error, Infallible>> {
+    fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), ModbusError<S::Error, Infallible>> {
         let mut filled = 0;
         while filled < buf.len() {
             match self.serial.read(&mut buf[filled..]) {

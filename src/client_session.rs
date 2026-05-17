@@ -24,7 +24,10 @@ pub struct ClientSession<'b, S, TX, TS, D = NoDelay> {
 
 impl<'b, S, TX, TS, D> ClientSession<'b, S, TX, TS, D> {
     pub(crate) fn new(client: &'b mut Client<S, TX, D>, stream: TS) -> Self {
-        Self { client, tcp: ModbusTcp::new(stream) }
+        Self {
+            client,
+            tcp: ModbusTcp::new(stream),
+        }
     }
 
     /// Consumes the session and returns the underlying TCP stream.
@@ -84,17 +87,28 @@ where
         let (rtu_resp, tid_warning) = match frame::tcp_resp_to_rtu(&tcp_resp, tid) {
             Ok(r) => (r, None),
             Err(ModbusError::InvalidTransactionId) => {
-                let rx_tid = tcp_resp.get(..2)
+                let rx_tid = tcp_resp
+                    .get(..2)
                     .map(|b| u16::from_be_bytes([b[0], b[1]]))
                     .unwrap_or(0);
                 let fallback = frame::tcp_resp_to_rtu(&tcp_resp, rx_tid)
                     .map_err(|_| BridgeError::BufferOverflow)?;
-                (fallback, Some(Warning::TransactionIdMismatch { expected: tid, got: rx_tid }))
+                (
+                    fallback,
+                    Some(Warning::TransactionIdMismatch {
+                        expected: tid,
+                        got: rx_tid,
+                    }),
+                )
             }
             Err(_) => return Err(BridgeError::BufferOverflow),
         };
 
-        self.client.rtu.send(&rtu_resp).await.map_err(BridgeError::RtuIo)?;
+        self.client
+            .rtu
+            .send(&rtu_resp)
+            .await
+            .map_err(BridgeError::RtuIo)?;
 
         if let Some(w) = tid_warning {
             return Ok(BridgeEvent::Warning(w));
@@ -191,17 +205,28 @@ where
         let (rtu_resp, tid_warning) = match frame::tcp_resp_to_rtu(&tcp_resp, tid) {
             Ok(r) => (r, None),
             Err(ModbusError::InvalidTransactionId) => {
-                let rx_tid = tcp_resp.get(..2)
+                let rx_tid = tcp_resp
+                    .get(..2)
                     .map(|b| u16::from_be_bytes([b[0], b[1]]))
                     .unwrap_or(0);
                 let fallback = frame::tcp_resp_to_rtu(&tcp_resp, rx_tid)
                     .map_err(|_| BridgeError::BufferOverflow)?;
-                (fallback, Some(Warning::TransactionIdMismatch { expected: tid, got: rx_tid }))
+                (
+                    fallback,
+                    Some(Warning::TransactionIdMismatch {
+                        expected: tid,
+                        got: rx_tid,
+                    }),
+                )
             }
             Err(_) => return Err(BridgeError::BufferOverflow),
         };
 
-        self.client.rtu.send(&rtu_resp).await.map_err(BridgeError::RtuIo)?;
+        self.client
+            .rtu
+            .send(&rtu_resp)
+            .await
+            .map_err(BridgeError::RtuIo)?;
 
         if let Some(w) = tid_warning {
             return Ok(BridgeEvent::Warning(w));
@@ -237,6 +262,10 @@ where
     /// - [`BridgeError::TcpClosed`](crate::BridgeError::TcpClosed) — Upstream TCP server closed the connection.
     /// - [`BridgeError::TcpIo`](crate::BridgeError::TcpIo) — TCP stream I/O error.
     /// - [`BridgeError::BufferOverflow`](crate::BridgeError::BufferOverflow) — Frame exceeded internal buffer capacity.
+    #[expect(
+        clippy::should_implement_trait,
+        reason = "drives one request/response cycle, not an iterator"
+    )]
     pub fn next(&mut self) -> Result<BridgeEvent, BridgeError<S::Error, TS::Error>> {
         let rtu_req = self.client.rtu.listen().map_err(|e| match e {
             ModbusError::Serial(se) => BridgeError::RtuIo(se),
@@ -267,15 +296,26 @@ where
             Err(ModbusError::InvalidTransactionId) => {
                 let rx_tid = if tcp_resp.len() >= 2 {
                     u16::from_be_bytes([tcp_resp[0], tcp_resp[1]])
-                } else { 0 };
+                } else {
+                    0
+                };
                 let fallback = frame::tcp_resp_to_rtu(&tcp_resp, rx_tid)
                     .map_err(|_| BridgeError::BufferOverflow)?;
-                (fallback, Some(Warning::TransactionIdMismatch { expected: tid, got: rx_tid }))
+                (
+                    fallback,
+                    Some(Warning::TransactionIdMismatch {
+                        expected: tid,
+                        got: rx_tid,
+                    }),
+                )
             }
             Err(_) => return Err(BridgeError::BufferOverflow),
         };
 
-        self.client.rtu.send(&rtu_resp).map_err(BridgeError::RtuIo)?;
+        self.client
+            .rtu
+            .send(&rtu_resp)
+            .map_err(BridgeError::RtuIo)?;
 
         if let Some(w) = tid_warning {
             return Ok(BridgeEvent::Warning(w));
@@ -314,6 +354,10 @@ where
     /// - [`BridgeError::TcpIo`](crate::BridgeError::TcpIo) — TCP stream I/O error.
     /// - [`BridgeError::BufferOverflow`](crate::BridgeError::BufferOverflow) — Frame exceeded internal buffer capacity.
     /// - [`BridgeError::Timeout`](crate::BridgeError::Timeout) — An I/O operation did not complete within the configured deadline.
+    #[expect(
+        clippy::should_implement_trait,
+        reason = "drives one request/response cycle, not an iterator"
+    )]
     pub fn next(&mut self) -> Result<BridgeEvent, BridgeError<S::Error, TS::Error>> {
         if let Some(timeout_ms) = self.client.rtu_timeout_ms {
             let mut elapsed = 0u32;
@@ -378,15 +422,26 @@ where
             Err(ModbusError::InvalidTransactionId) => {
                 let rx_tid = if tcp_resp.len() >= 2 {
                     u16::from_be_bytes([tcp_resp[0], tcp_resp[1]])
-                } else { 0 };
+                } else {
+                    0
+                };
                 let fallback = frame::tcp_resp_to_rtu(&tcp_resp, rx_tid)
                     .map_err(|_| BridgeError::BufferOverflow)?;
-                (fallback, Some(Warning::TransactionIdMismatch { expected: tid, got: rx_tid }))
+                (
+                    fallback,
+                    Some(Warning::TransactionIdMismatch {
+                        expected: tid,
+                        got: rx_tid,
+                    }),
+                )
             }
             Err(_) => return Err(BridgeError::BufferOverflow),
         };
 
-        self.client.rtu.send(&rtu_resp).map_err(BridgeError::RtuIo)?;
+        self.client
+            .rtu
+            .send(&rtu_resp)
+            .map_err(BridgeError::RtuIo)?;
 
         if let Some(w) = tid_warning {
             return Ok(BridgeEvent::Warning(w));

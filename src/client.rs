@@ -4,7 +4,9 @@
 //! the serial bus acts as the *request source* (an RTU master talks to this device) and
 //! the TCP stream connects to an *upstream Modbus TCP server*.
 
-use crate::{client_builder::ClientBuilder, client_session::ClientSession, rtu::ModbusRtu, NoDelay};
+use crate::{
+    client_builder::ClientBuilder, client_session::ClientSession, rtu::ModbusRtu, NoDelay,
+};
 use embedded_hal::digital::OutputPin;
 
 /// Modbus RTU→TCP client.
