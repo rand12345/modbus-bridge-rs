@@ -7,6 +7,7 @@ description = "Portable no_std Modbus RTU/TCP bridge — async and blocking"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/rand12345/modbus-bridge-rs"
 documentation = "https://docs.rs/modbus-bridge"
+readme = "README.md"
 keywords = ["modbus", "rtu", "tcp", "bridge", "no-std"]
 categories = ["embedded", "network-programming", "no-std"]
 exclude = [
