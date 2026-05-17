@@ -22,9 +22,17 @@ async   = ["dep:embedded-io-async", "dep:embedded-hal-async", "dep:futures-util"
 sync    = ["dep:embedded-io"]
 defmt   = ["dep:defmt"]
 log     = ["dep:log"]
+tokio-integration = []        # gate for in-process tokio integration tests
 
 [dev-dependencies]
-futures = { version = "0.3", default-features = false, features = ["executor", "std"] }
+futures              = { version = "0.3", default-features = false, features = ["executor", "std"] }
+tokio                = { version = "1", features = ["full"] }
+tokio-modbus         = { version = "0.17", default-features = false, features = ["tcp"] }
+embedded-io-adapters = { version = "0.6", features = ["tokio-1"] }
+
+[[test]]
+name = "tokio_integration"
+required-features = ["tokio-integration"]
 
 [dependencies]
 heapless          = { version = "0.8", default-features = false }

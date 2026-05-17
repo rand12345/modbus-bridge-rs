@@ -132,11 +132,23 @@ pub fn rtu_resp_to_tcp(
 
 // ── RTU response framing helper ───────────────────────────────────────────────
 
-/// Given the first 3 bytes of an RTU response `[addr, fn_code, byte_count]`,
+/// Given the first 3 bytes of an RTU response `[addr, fn_code, byte3]`,
 /// return the number of additional bytes to read to complete the frame
 /// (payload bytes + 2 CRC bytes).
+///
+/// RTU response frame layouts:
+/// - Read FCs (01–04): `[addr, fc, byte_count, data…, crc(2)]`  → `byte_count + 2` remaining
+/// - Write-echo FCs (05, 06, 0F, 10): `[addr, fc, addr_hi, addr_lo, val/qty(2), crc(2)]` → 5 remaining
+/// - Exception (fc | 0x80): `[addr, fc|0x80, code, crc(2)]` → 2 remaining
 pub fn rtu_response_remaining(header: &[u8; 3]) -> usize {
-    header[2] as usize + 2
+    match header[1] {
+        // Exception responses: FC + 0x80; body is [unit, fc|0x80, code, crc_lo, crc_hi]
+        0x80..=0xFF => 2,
+        // Write-echo responses: fixed 8-byte frame; after the 3-byte header, 5 bytes remain
+        0x05 | 0x06 | 0x0F | 0x10 => 5,
+        // Read FCs and any unrecognised FC: header[2] is byte_count
+        _ => header[2] as usize + 2,
+    }
 }
 
 // ── Request parsing helper ────────────────────────────────────────────────────
@@ -213,13 +225,43 @@ mod tests {
     // ── rtu_response_remaining ────────────────────────────────────────────────
 
     #[test]
-    fn remaining_zero_byte_count_is_two_crc_bytes() {
+    fn remaining_read_fc_zero_byte_count() {
+        // FC03 read response with byte_count=0 → only CRC remains.
         assert_eq!(rtu_response_remaining(&[0x01, 0x03, 0x00]), 2);
     }
 
     #[test]
-    fn remaining_max_byte_count() {
+    fn remaining_read_fc_max_byte_count() {
         assert_eq!(rtu_response_remaining(&[0x01, 0x03, 0xFF]), 257);
+    }
+
+    #[test]
+    fn remaining_write_single_coil_fc05() {
+        // FC05 echo response is 8 bytes total; after 3-byte header, 5 remain.
+        assert_eq!(rtu_response_remaining(&[0x01, 0x05, 0x00]), 5);
+    }
+
+    #[test]
+    fn remaining_write_single_register_fc06() {
+        assert_eq!(rtu_response_remaining(&[0x01, 0x06, 0x00]), 5);
+    }
+
+    #[test]
+    fn remaining_write_multiple_coils_fc0f() {
+        assert_eq!(rtu_response_remaining(&[0x01, 0x0F, 0x00]), 5);
+    }
+
+    #[test]
+    fn remaining_write_multiple_registers_fc10() {
+        assert_eq!(rtu_response_remaining(&[0x01, 0x10, 0x00]), 5);
+    }
+
+    #[test]
+    fn remaining_exception_response() {
+        // Exception: FC + 0x80; after 3-byte header only the 2 CRC bytes remain.
+        assert_eq!(rtu_response_remaining(&[0x01, 0x83, 0x02]), 2);
+        assert_eq!(rtu_response_remaining(&[0x01, 0x85, 0x02]), 2);
+        assert_eq!(rtu_response_remaining(&[0x01, 0x90, 0x02]), 2);
     }
 
     // ── roundtrip invariants ──────────────────────────────────────────────────
