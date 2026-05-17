@@ -25,7 +25,7 @@ Add to `Cargo.toml`:
 
 ```toml
 # Async (Embassy, smoltcp — enabled by default)
-modbus-bridge = { version = "0.2", features = ["async"] }
+modbus-bridge = { version = "0.2" }
 
 # Blocking (esp-idf-hal, FreeRTOS tasks, bare-metal loops)
 modbus-bridge = { version = "0.2", default-features = false, features = ["sync"] }
@@ -130,7 +130,7 @@ let bridge = Bridge::builder()
     .rtu(uart, tx_en)
     .rtu_timeout(500)   // 500 ms for RTU device response
     .tcp_timeout(5000)  // 5 s for incoming TCP request
-    .delay(my_timer)    // any embedded_hal::delay::DelayNs impl
+    .delay(my_timer)    // embedded_hal_async::delay::DelayNs (async) or embedded_hal::delay::DelayNs (sync)
     .build();
 ```
 
