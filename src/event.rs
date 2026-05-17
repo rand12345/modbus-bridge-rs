@@ -140,10 +140,9 @@ pub enum Warning {
 impl fmt::Display for Warning {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::TransactionIdMismatch { expected, got } => write!(
-                f,
-                "transaction ID mismatch: expected {expected}, got {got}"
-            ),
+            Self::TransactionIdMismatch { expected, got } => {
+                write!(f, "transaction ID mismatch: expected {expected}, got {got}")
+            }
         }
     }
 }

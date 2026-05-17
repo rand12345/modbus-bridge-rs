@@ -67,9 +67,7 @@ pub fn rtu_to_tcp(
 
 /// Unwrap a Modbus TCP request into an RTU frame (PDU + CRC).
 /// Returns `(rtu_frame, transaction_id)`.
-pub fn tcp_to_rtu(
-    tcp: &[u8],
-) -> Result<(RtuResponse, u16), ModbusError<Infallible, Infallible>> {
+pub fn tcp_to_rtu(tcp: &[u8]) -> Result<(RtuResponse, u16), ModbusError<Infallible, Infallible>> {
     if tcp.len() < 7 {
         return Err(ModbusError::PayloadTooShort);
     }

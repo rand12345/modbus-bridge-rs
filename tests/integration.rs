@@ -212,7 +212,9 @@ mod client_fixtures {
 #[cfg(feature = "async")]
 mod bridge_tests {
     use futures::executor::block_on;
-    use modbus_bridge::{Bridge, BridgeBuilder, BridgeError, BridgeEvent, FunctionCode, Transaction};
+    use modbus_bridge::{
+        Bridge, BridgeBuilder, BridgeError, BridgeEvent, FunctionCode, Transaction,
+    };
 
     use crate::{
         fixtures,
@@ -265,7 +267,10 @@ mod bridge_tests {
             let mut bridge = make_bridge(&fixtures::rtu_bad_crc_response());
             let mut conn = bridge.accept(MockStream::with_rx(&fixtures::tcp_read_request()));
 
-            assert!(matches!(conn.next().await, Err(BridgeError::RtuCrcMismatch)));
+            assert!(matches!(
+                conn.next().await,
+                Err(BridgeError::RtuCrcMismatch)
+            ));
         });
     }
 
@@ -335,7 +340,9 @@ mod bridge_tests {
 #[cfg(feature = "async")]
 mod client_tests {
     use futures::executor::block_on;
-    use modbus_bridge::{Client, ClientBuilder, BridgeError, BridgeEvent, FunctionCode, Transaction};
+    use modbus_bridge::{
+        BridgeError, BridgeEvent, Client, ClientBuilder, FunctionCode, Transaction,
+    };
 
     use crate::{
         client_fixtures,
@@ -352,7 +359,8 @@ mod client_tests {
     fn next_returns_transaction_on_happy_path() {
         block_on(async {
             let mut client = make_client(&client_fixtures::rtu_read_request());
-            let mut session = client.connect(MockStream::with_rx(&client_fixtures::tcp_read_response()));
+            let mut session =
+                client.connect(MockStream::with_rx(&client_fixtures::tcp_read_response()));
 
             let event = session.next().await.expect("next() should succeed");
 
@@ -376,7 +384,8 @@ mod client_tests {
     fn next_returns_rtu_closed_on_empty_rtu_stream() {
         block_on(async {
             let mut client = make_client(&[]);
-            let mut session = client.connect(MockStream::with_rx(&client_fixtures::tcp_read_response()));
+            let mut session =
+                client.connect(MockStream::with_rx(&client_fixtures::tcp_read_response()));
 
             assert!(matches!(session.next().await, Err(BridgeError::RtuClosed)));
         });
@@ -386,7 +395,9 @@ mod client_tests {
     fn next_returns_tcp_closed_on_truncated_tcp_response() {
         block_on(async {
             let mut client = make_client(&client_fixtures::rtu_read_request());
-            let mut session = client.connect(MockStream::with_rx(&client_fixtures::tcp_truncated_response()));
+            let mut session = client.connect(MockStream::with_rx(
+                &client_fixtures::tcp_truncated_response(),
+            ));
 
             assert!(matches!(session.next().await, Err(BridgeError::TcpClosed)));
         });
@@ -396,7 +407,9 @@ mod client_tests {
     fn next_returns_warning_on_tid_mismatch() {
         block_on(async {
             let mut client = make_client(&client_fixtures::rtu_read_request());
-            let mut session = client.connect(MockStream::with_rx(&client_fixtures::tcp_tid_mismatch_response()));
+            let mut session = client.connect(MockStream::with_rx(
+                &client_fixtures::tcp_tid_mismatch_response(),
+            ));
 
             let event = session.next().await.expect("should succeed with warning");
             assert!(
@@ -427,7 +440,8 @@ mod client_tests {
     fn into_stream_returns_tcp_stream_with_bytes_written() {
         block_on(async {
             let mut client = make_client(&client_fixtures::rtu_read_request());
-            let mut session = client.connect(MockStream::with_rx(&client_fixtures::tcp_read_response()));
+            let mut session =
+                client.connect(MockStream::with_rx(&client_fixtures::tcp_read_response()));
 
             session.next().await.expect("ok");
             let stream = session.into_stream();
@@ -474,7 +488,10 @@ mod event_tests {
         assert_eq!(FunctionCode::from(0x05), FunctionCode::WriteSingleCoil);
         assert_eq!(FunctionCode::from(0x06), FunctionCode::WriteSingleRegister);
         assert_eq!(FunctionCode::from(0x0F), FunctionCode::WriteMultipleCoils);
-        assert_eq!(FunctionCode::from(0x10), FunctionCode::WriteMultipleRegisters);
+        assert_eq!(
+            FunctionCode::from(0x10),
+            FunctionCode::WriteMultipleRegisters
+        );
         assert_eq!(FunctionCode::from(0xAB), FunctionCode::Other(0xAB));
     }
 
@@ -606,8 +623,7 @@ mod timeout_tests {
     use modbus_bridge::{BridgeBuilder, BridgeError, ClientBuilder};
 
     use crate::{
-        client_fixtures,
-        fixtures,
+        client_fixtures, fixtures,
         mock::{InstantDelay, MockPin, MockStream, StallStream},
     };
 
@@ -621,7 +637,8 @@ mod timeout_tests {
                 .delay(InstantDelay)
                 .build();
 
-            let mut session = client.connect(MockStream::with_rx(&client_fixtures::tcp_read_response()));
+            let mut session =
+                client.connect(MockStream::with_rx(&client_fixtures::tcp_read_response()));
 
             assert!(
                 matches!(session.next().await, Err(BridgeError::Timeout)),
@@ -635,7 +652,10 @@ mod timeout_tests {
         block_on(async {
             // RTU request arrives fine; TCP server response stalls.
             let mut client = ClientBuilder::new()
-                .rtu(MockStream::with_rx(&client_fixtures::rtu_read_request()), MockPin)
+                .rtu(
+                    MockStream::with_rx(&client_fixtures::rtu_read_request()),
+                    MockPin,
+                )
                 .tcp_timeout(500)
                 .delay(InstantDelay)
                 .build();
@@ -654,10 +674,14 @@ mod timeout_tests {
         block_on(async {
             // No timeout configured, NoDelay used — happy path still works.
             let mut client = ClientBuilder::new()
-                .rtu(MockStream::with_rx(&client_fixtures::rtu_read_request()), MockPin)
+                .rtu(
+                    MockStream::with_rx(&client_fixtures::rtu_read_request()),
+                    MockPin,
+                )
                 .build();
 
-            let mut session = client.connect(MockStream::with_rx(&client_fixtures::tcp_read_response()));
+            let mut session =
+                client.connect(MockStream::with_rx(&client_fixtures::tcp_read_response()));
 
             assert!(session.next().await.is_ok(), "expected Ok");
         });

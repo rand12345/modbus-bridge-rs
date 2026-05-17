@@ -220,8 +220,12 @@ impl embedded_hal::digital::ErrorType for NoPin {
 }
 
 impl embedded_hal::digital::OutputPin for NoPin {
-    fn set_high(&mut self) -> Result<(), Self::Error> { Ok(()) }
-    fn set_low(&mut self) -> Result<(), Self::Error> { Ok(()) }
+    fn set_high(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+    fn set_low(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
 }
 
 // ── No-op delay provider ──────────────────────────────────────────────────────
@@ -303,7 +307,7 @@ pub(crate) use mb_info;
 #[doc(hidden)]
 pub mod __fuzzing {
     pub use crate::frame::{
-        check_crc, crc, rtu_resp_to_tcp, rtu_response_remaining, rtu_to_tcp,
-        tcp_resp_to_rtu, tcp_to_rtu,
+        check_crc, crc, rtu_resp_to_tcp, rtu_response_remaining, rtu_to_tcp, tcp_resp_to_rtu,
+        tcp_to_rtu,
     };
 }

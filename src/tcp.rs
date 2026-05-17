@@ -30,7 +30,6 @@ impl<S> ModbusTcp<S> {
         self.transaction_id = self.transaction_id.wrapping_add(1);
         self.transaction_id
     }
-
 }
 
 // ── Async impl ────────────────────────────────────────────────────────────────
@@ -52,7 +51,8 @@ where
 
         let pdu_len = u16::from_be_bytes([mbap[4], mbap[5]]) as usize;
         let mut req = heapless::Vec::<u8, TCP_BUF>::new();
-        req.extend_from_slice(&mbap).map_err(|_| ModbusError::Push)?;
+        req.extend_from_slice(&mbap)
+            .map_err(|_| ModbusError::Push)?;
 
         let mut byte = [0u8; 1];
         for _ in 0..pdu_len {
@@ -121,7 +121,8 @@ where
 
         let pdu_len = u16::from_be_bytes([mbap[4], mbap[5]]) as usize;
         let mut req = heapless::Vec::<u8, TCP_BUF>::new();
-        req.extend_from_slice(&mbap).map_err(|_| ModbusError::Push)?;
+        req.extend_from_slice(&mbap)
+            .map_err(|_| ModbusError::Push)?;
 
         let mut byte = [0u8; 1];
         for _ in 0..pdu_len {
@@ -155,10 +156,7 @@ where
         Ok(())
     }
 
-    fn read_exact(
-        &mut self,
-        buf: &mut [u8],
-    ) -> Result<(), ModbusError<Infallible, S::Error>> {
+    fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), ModbusError<Infallible, S::Error>> {
         let mut filled = 0;
         while filled < buf.len() {
             match self.stream.read(&mut buf[filled..]) {

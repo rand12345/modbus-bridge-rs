@@ -32,7 +32,11 @@ fn crc16(data: &[u8]) -> [u8; 2] {
     for &b in data {
         crc ^= b as u16;
         for _ in 0..8 {
-            crc = if crc & 1 != 0 { (crc >> 1) ^ 0xA001 } else { crc >> 1 };
+            crc = if crc & 1 != 0 {
+                (crc >> 1) ^ 0xA001
+            } else {
+                crc >> 1
+            };
         }
     }
     crc.to_le_bytes()
@@ -189,7 +193,9 @@ async fn setup() -> impl Client + Reader + Writer {
             .rtu(FromTokio::new(bridge_serial), NoPin)
             .build();
         loop {
-            let Ok((tcp, _)) = listener.accept().await else { break };
+            let Ok((tcp, _)) = listener.accept().await else {
+                break;
+            };
             let mut conn = bridge.accept(FromTokio::new(tcp));
             loop {
                 match conn.next().await {
