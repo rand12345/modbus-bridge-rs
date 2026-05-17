@@ -35,7 +35,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Unit + integration tests (sync)
-        run: cargo test --features sync
+        run: cargo test --no-default-features --features sync
 
   msrv:
     name: MSRV (1.81)
@@ -51,7 +51,7 @@ jobs:
         run: cargo check --features async
 
       - name: Check (sync)
-        run: cargo check --features sync
+        run: cargo check --no-default-features --features sync
 
   clippy:
     name: Clippy
@@ -64,7 +64,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - run: cargo clippy --features async -- -D warnings
-      - run: cargo clippy --features sync -- -D warnings
+      - run: cargo clippy --no-default-features --features sync -- -D warnings
 
   fmt:
     name: Rustfmt
@@ -90,4 +90,4 @@ jobs:
         run: cargo check --target thumbv7em-none-eabi --features async
 
       - name: Check sync (no_std)
-        run: cargo check --target thumbv7em-none-eabi --features sync
+        run: cargo check --target thumbv7em-none-eabi --no-default-features --features sync
