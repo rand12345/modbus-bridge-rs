@@ -13,6 +13,8 @@ categories = ["embedded", "network-programming", "no-std"]
 exclude = [
     "fuzz/",
     ".cargo/",
+    ".github/",
+    "docs/",
     "CLAUDE.md",
 ]
 
