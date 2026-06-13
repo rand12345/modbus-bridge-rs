@@ -189,6 +189,18 @@ pub mod event;
 
 pub use bridge::Bridge;
 pub use builder::BridgeBuilder;
+
+/// Returns a [`BridgeBuilder`] for constructing a [`Bridge`].
+///
+/// Equivalent to [`Bridge::builder()`], but avoids type-inference failures that
+/// occur when the compiler cannot deduce the `Bridge` type parameters from
+/// context (e.g. in Embassy tasks where the UART type is known only later in
+/// the builder chain).
+///
+/// Prefer this over `Bridge::builder()` in generic or no-infer contexts.
+pub fn builder() -> BridgeBuilder<(), (), NoDelay> {
+    BridgeBuilder::new()
+}
 pub use client::Client;
 pub use client_builder::ClientBuilder;
 pub use client_session::ClientSession;
