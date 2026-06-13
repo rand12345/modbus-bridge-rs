@@ -11,6 +11,14 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MockError;
 
+impl core::fmt::Display for MockError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("mock I/O error")
+    }
+}
+
+impl std::error::Error for MockError {}
+
 // ── Mock I/O (async only) ─────────────────────────────────────────────────────
 
 #[cfg(feature = "async")]
