@@ -1,0 +1,6 @@
+# https://github.com/googleapis/release-please
+release-type: cargo-manifest
+handle-github-release: true
+bump-minor-pre-major: true
+packages:
+  .: {}
