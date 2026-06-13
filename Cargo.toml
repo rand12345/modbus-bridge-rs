@@ -30,7 +30,7 @@ tokio-integration = []        # gate for in-process tokio integration tests
 futures              = { version = "0.3", default-features = false, features = ["executor", "std"] }
 tokio                = { version = "1", features = ["full"] }
 tokio-modbus         = { version = "0.17", default-features = false, features = ["tcp"] }
-embedded-io-adapters = { version = "0.6", features = ["tokio-1"] }
+embedded-io-adapters = { version = "0.7", features = ["tokio-1"] }
 
 [[test]]
 name = "tokio_integration"
