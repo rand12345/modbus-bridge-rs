@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/rand12345/modbus-bridge-rs/compare/modbus-bridge-v0.3.0...modbus-bridge-v0.3.1) (2026-06-13)
+
+
+### Bug Fixes
+
+* **ci:** align Publish tag pattern with release-please component-prefixed tags ([a7866d0](https://github.com/rand12345/modbus-bridge-rs/commit/a7866d0f2f8b1a01a10a9e46e769b0a77f87f87d))
+
 ## [0.3.0](https://github.com/rand12345/modbus-bridge-rs/compare/modbus-bridge-v0.2.1...modbus-bridge-v0.3.0) (2026-06-13)
 
 
