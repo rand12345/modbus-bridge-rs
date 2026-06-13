@@ -1,2 +1,4 @@
 # Release metadata requires repo-owner approval to merge.
-/.release-please/     @rand12345
+# Enable in branch protection settings: "Require review from code owners".
+/release-please-config.json     @rand12345
+/.release-please/              @rand12345

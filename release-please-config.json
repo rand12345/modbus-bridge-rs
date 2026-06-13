@@ -1,0 +1,9 @@
+{
+    "packages": {
+      ".": {
+        "release-type": "cargo-manifest",
+        "bump-minor-pre-major": true
+      }
+    },
+    "include-v-in-tag": true
+}
