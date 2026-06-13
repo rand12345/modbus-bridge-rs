@@ -1,0 +1,21 @@
+name: Release Please
+
+# Trigger when any human-authored PR is merged to main.
+# release-please creates a "chore: release …" PR with the correct version bump.
+# When that PR is merged (by repo owner — see CODEOWNERS), tags are created
+# and the Publish workflow picks them up automatically.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write         # create release PRs + tags
+  pull-requests: write    # create/update release PR
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
