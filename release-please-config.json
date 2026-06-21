@@ -1,9 +1,14 @@
 {
+   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
    "packages": {
      ".": {
        "release-type": "rust",
        "bump-minor-pre-major": true,
-       "skip": []
+       "skip": [],
+       "extra-files": [
+         "README.md",
+         "src/lib.rs"
+       ]
      }
    },
    "include-v-in-tag": true

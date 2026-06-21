@@ -21,10 +21,10 @@
 //! ```toml
 //! [dependencies]
 //! # Async — Embassy, smoltcp, and other async runtimes (enabled by default)
-//! modbus-bridge = { version = "0.2", features = ["async", "defmt"] }
+//! modbus-bridge = { version = "0.3.1", features = ["async", "defmt"] } # x-release-please-version
 //!
 //! # Blocking — esp-idf-hal, FreeRTOS tasks, bare-metal loops
-//! modbus-bridge = { version = "0.2", default-features = false, features = ["sync", "log"] }
+//! modbus-bridge = { version = "0.3.1", default-features = false, features = ["sync", "log"] } # x-release-please-version
 //! ```
 //!
 //! `async` and `sync` are mutually exclusive — enable exactly one.
