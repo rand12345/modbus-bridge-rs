@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.3](https://github.com/rand12345/modbus-bridge-rs/compare/modbus-bridge-v0.3.2...modbus-bridge-v0.3.3) (2026-06-21)
+
+
+### Bug Fixes
+
+* **release:** use PAT for release-please tagging ([6d79fe5](https://github.com/rand12345/modbus-bridge-rs/commit/6d79fe54b6484a00336446a27edeb2fb6910d0a6))
+
 ## [0.3.2](https://github.com/rand12345/modbus-bridge-rs/compare/modbus-bridge-v0.3.1...modbus-bridge-v0.3.2) (2026-06-21)
 
 

@@ -1,6 +1,6 @@
 [package]
 name = "modbus-bridge"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2021"
 rust-version = "1.81"
 description = "Portable no_std Modbus RTU/TCP bridge — async and blocking"

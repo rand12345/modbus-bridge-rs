@@ -25,10 +25,10 @@ Add to `Cargo.toml`:
 
 ```toml
 # Async (Embassy, smoltcp — enabled by default)
-modbus-bridge = { version = "0.3.2" } # x-release-please-version
+modbus-bridge = { version = "0.3.3" } # x-release-please-version
 
 # Blocking (esp-idf-hal, FreeRTOS tasks, bare-metal loops)
-modbus-bridge = { version = "0.3.2", default-features = false, features = ["sync"] } # x-release-please-version
+modbus-bridge = { version = "0.3.3", default-features = false, features = ["sync"] } # x-release-please-version
 ```
 
 `async` and `sync` are mutually exclusive — enable exactly one.
