@@ -2,8 +2,12 @@ name: Release Please
 
 # Trigger when any human-authored PR is merged to main.
 # release-please creates a "chore: release …" PR with the correct version bump.
-# When that PR is merged (by repo owner — see CODEOWNERS), tags are created
-# and the Publish workflow picks them up automatically.
+# When that PR is merged, release-please creates the release tag and GitHub
+# release. This must use a PAT-backed secret rather than GITHUB_TOKEN:
+# 1. this repo restricts tag creation for automation without a bypass-capable credential
+# 2. tag pushes created by GITHUB_TOKEN do not trigger downstream workflows
+# Set RELEASE_PLEASE_TOKEN to a token that can write contents and bypass the
+# repository's tag-creation rule.
 on:
   push:
     branches: [main]
@@ -18,4 +22,4 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
