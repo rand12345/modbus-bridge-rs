@@ -1,12 +1,11 @@
 //! Modbus RTU transport — async or blocking serial I/O over `embedded_io_async` / `embedded_io`.
 
-#[cfg(any(feature = "defmt", feature = "log"))]
-use crate::mb_info;
 use crate::{
     error::ModbusError,
     frame::{self, RtuResponse},
-    mb_error,
 };
+#[cfg(any(feature = "defmt", feature = "log"))]
+use crate::{mb_error, mb_info};
 use core::convert::Infallible;
 use embedded_hal::digital::OutputPin;
 
