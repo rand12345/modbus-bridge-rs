@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.2](https://github.com/rand12345/modbus-bridge-rs/compare/modbus-bridge-v0.3.1...modbus-bridge-v0.3.2) (2026-06-21)
+
+
+### Bug Fixes
+
+* **release:** keep dependency docs in sync ([d87540c](https://github.com/rand12345/modbus-bridge-rs/commit/d87540cee276b0effed6a2d193d2d83865615a05))
+* **rtu:** correct feature-gated logging imports ([3312750](https://github.com/rand12345/modbus-bridge-rs/commit/3312750f9007692214b3aeca8b93ad49ea0d8374))
+* **rtu:** retry transient async read errors ([bb4edda](https://github.com/rand12345/modbus-bridge-rs/commit/bb4edda05e6cf61d44239b71344aa909fc705d26))
+* **rtu:** retry transient sync read errors ([a98a755](https://github.com/rand12345/modbus-bridge-rs/commit/a98a755e699375aefd5fdae0bf6ebca431a726ae))
+
 ## [0.3.1](https://github.com/rand12345/modbus-bridge-rs/compare/modbus-bridge-v0.3.0...modbus-bridge-v0.3.1) (2026-06-13)
 
 
