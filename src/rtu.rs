@@ -285,13 +285,19 @@ where
 
     fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), ModbusError<S::Error, Infallible>> {
         let mut filled = 0;
+        let mut attempt = 1;
         while filled < buf.len() {
             match self.serial.read(&mut buf[filled..]) {
                 Ok(0) => return Err(ModbusError::PayloadTooShort),
                 Ok(n) => filled += n,
                 Err(e) => {
-                    mb_error!("RTU read error");
-                    return Err(ModbusError::Serial(e));
+                    #[cfg(all(not(feature = "defmt"), feature = "log"))]
+                    mb_error!("RTU read error {e} attempt {attempt}/10");
+                    if attempt > 10 {
+                        return Err(ModbusError::Serial(e));
+                    } else {
+                        attempt += 1;
+                    }
                 }
             }
         }
